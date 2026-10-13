@@ -26,7 +26,12 @@ import { ESTADOS } from './datos.js'
 // Pista: prueba en la consola 0.1 + 0.2 y verás por qué hay que redondear.
 //        Math.round(x * 100) / 100
 export function totalPedido(pedido) {
-  return 0 // TODO
+  const subtotal = (pedido.items ?? []).reduce(
+    (acumulado, item) => acumulado + item.cantidad * item.precioUnitario,
+    0,
+  )
+  const descuento = pedido.descuento ?? 0
+  return Math.round(subtotal * (1 - descuento) * 100) / 100
 }
 
 // ----------------------------------------------------------------------------
@@ -39,7 +44,9 @@ export function totalPedido(pedido) {
 // Un estado que no existe también es false.
 // Pista: ESTADOS ya es un arreglo ordenado. ¿Qué te dice indexOf?
 export function puedeTransicionar(actual, nuevo) {
-  return true // TODO: hoy acepta cualquier cosa. ¿Qué tan grave sería eso en producción?
+  const indiceActual = ESTADOS.indexOf(actual)
+  const indiceNuevo = ESTADOS.indexOf(nuevo)
+  return indiceActual !== -1 && indiceNuevo === indiceActual + 1
 }
 
 // ----------------------------------------------------------------------------
@@ -54,7 +61,24 @@ export function puedeTransicionar(actual, nuevo) {
 //                         correo: algo@algo.algo   (el email es opcional)
 // Pista: '55 1234-5678'.replace(/[\s-]/g, '')   y   /^\d{10}$/.test(...)
 export function validarCliente(cliente) {
-  return [] // TODO
+  const errores = []
+  if (typeof cliente.nombre !== 'string' || cliente.nombre.trim() === '') {
+    errores.push('nombre_requerido')
+  }
+
+  const telefono = typeof cliente.telefono === 'string'
+    ? cliente.telefono.replace(/[\s-]/g, '')
+    : ''
+  if (!/^\d{10}$/.test(telefono)) {
+    errores.push('telefono_invalido')
+  }
+
+  const email = typeof cliente.email === 'string' ? cliente.email.trim() : ''
+  if (email !== '' && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    errores.push('email_invalido')
+  }
+
+  return errores
 }
 
 // ----------------------------------------------------------------------------
@@ -64,7 +88,13 @@ export function validarCliente(cliente) {
 //   { registrado: 3, en_preparacion: 3, listo: 2, entregado: 2 }
 // Con una lista vacía, todos van en 0.
 export function resumenPorEstado(pedidos) {
-  return {} // TODO
+  const resumen = Object.fromEntries(ESTADOS.map((estado) => [estado, 0]))
+  for (const pedido of pedidos) {
+    if (Object.hasOwn(resumen, pedido.estado)) {
+      resumen[pedido.estado]++
+    }
+  }
+  return resumen
 }
 
 // ----------------------------------------------------------------------------
@@ -76,7 +106,15 @@ export function resumenPorEstado(pedidos) {
 // Pista: 'Ramírez'.normalize('NFD').replace(/[̀-ͯ]/g, '')
 //        Investiga qué hace NFD. Es un problema real en sistemas en español.
 export function buscarPedidos(pedidos, texto) {
-  return [] // TODO
+  const normalizar = (valor) => valor
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+
+  const busqueda = normalizar(typeof texto === 'string' ? texto.trim() : '')
+  if (busqueda === '') return pedidos
+
+  return pedidos.filter((pedido) => normalizar(pedido.cliente).includes(busqueda))
 }
 
 // ----------------------------------------------------------------------------
@@ -88,5 +126,14 @@ export function buscarPedidos(pedidos, texto) {
 // Orden: total de mayor a menor; si empatan, por nombre alfabético.
 // Pista: un objeto acumulador, luego Object.entries, map y sort.
 export function topClientes(pedidos, n) {
-  return [] // TODO
+  const totales = new Map()
+  for (const pedido of pedidos) {
+    const totalActual = totales.get(pedido.cliente) ?? 0
+    totales.set(pedido.cliente, totalActual + totalPedido(pedido))
+  }
+
+  return [...totales.entries()]
+    .map(([cliente, total]) => ({ cliente, total }))
+    .sort((a, b) => b.total - a.total || a.cliente.localeCompare(b.cliente))
+    .slice(0, n)
 }
